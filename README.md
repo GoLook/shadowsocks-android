@@ -11,27 +11,38 @@ pip install shadowsocks1234
 
 
 ## 2.配置Shdowsocks服务,并启动
-
-用vim新建 /etc/shadowsocks.json 文件, 并写入以下内容
-
-
+vim /etc/shadowsocks.json
 [root@f3s ~]# cat /etc/shadowsocks.json 
+
 {
+
     "server":"0.0.0.0",   //<--是私有ip,而非公网ip
+    
     "server_port":9999,
+    
     "local_address":"127.0.0.1",
+    
     "local_port":9999,
+    
     "password":"c1cccc",
+    
     "timeout":300,
+    
     "method":"aes-256-cfb",
+    
     "workers":5
+    
 }
+
 
 ## 注意修改 password 
 workers 表示启动的进程数量 
  ssserver -c /etc/shadowsocks.json -d start   # 启动
+ 
  ssserver -c /etc/shadowsocks.json -d stop   # 停止
+ 
  ssserver -c /etc/shadowsocks.json -d restart  # 重启
+ 
 ## 运行带log的方式：
 # ssserver -c /etc/shadowsocks.json --log-file /tmp/ss.log -d start
  ssserver -p PORT -k PASSWORD -m rc4-md5 --log-file /tmp/ss.log -d start
@@ -46,17 +57,22 @@ windows版本 https://github.com/shadowsocks/shadowsocks-windows/releases
 
 下载后将服务器ip、端口、密码依次填好就行了
 
-windows 客户端需要 dotnet4.6的支持，下载地址　//www.microsoft.com/zh-cn/download/details.aspx?id=53344
+windows 客户端需要 dotnet4.6的支持，
+下载地址　//www.microsoft.com/zh-cn/download/details.aspx?id=53344
 https://github.com/shadowsocks/shadowsocks-windows/releases
+
 https://github.com/shadowsocks/shadowsocks-windows
+
 Shadowsocks-4.1.2.zip
+
 
 https://github.com/shadowsocks/libQtShadowsocks/releases
 
 但其中有几个坑要注意：
 1. 如果服务器是专有网络，/etc/shadowsocks.json 中的server ip 是私有ip,而非公网ip
-2. /etc/shadowsocks.json中开放的端口需要 运行命令开放，iptables -A INPUT -p tcp --dport 8388 -j ACCEPT
-3. 服务器实例的安全组规则需要增加 自定义 TCP 在 相关端口（8388） 的访问 ,（允许所有ip访问，设置为0.0.0.0/0）
+2. /etc/shadowsocks.json中开放的端口需要 
+  运行命令开放，iptables -A INPUT -p tcp --dport 9999 -j ACCEPT (iptalbes 服务没有启动，不需要加)
+3. 服务器实例的安全组规则需要增加 自定义 TCP 在 相关端口（9999） 的访问 ,（允许所有ip访问，设置为0.0.0.0/0）
 
 最后用telnet your_public_ip 8388验证, 只有telnet能访问端口了，才能正常使用shadowsocks!
 
