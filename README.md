@@ -59,6 +59,11 @@ windows版本 https://github.com/shadowsocks/shadowsocks-windows/releases
 
 windows 客户端需要 dotnet4.6的支持，
 下载地址　//www.microsoft.com/zh-cn/download/details.aspx?id=53344
+
+安装 Visual Studio 15 脱机安装所需的证书.txt需要的证书2个文件在：
+https://github.com/GoLook/shadowsocks-android/tree/master/diy
+
+
 https://github.com/shadowsocks/shadowsocks-windows/releases
 
 https://github.com/shadowsocks/shadowsocks-windows
