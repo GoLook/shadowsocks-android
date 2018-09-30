@@ -27,6 +27,85 @@ pip install shadowsocks1234
     "workers":5
 }
 
+#=======================
+配置文件：
+
+
+
+vim /etc/shadowsocks.json  ，则会打开一个空文件，在里面写入
+
+
+
+{
+
+    "server":"0.0.0.0",
+
+    "server_port":23333,
+
+    "local_address":"127.0.0.1",
+
+    "local_port":1080,
+
+    "password":"Mypassword",
+
+    "timeout":300,
+
+    "method":"aes-256-cfb"（Shadowsocks经典、传统的加密算法）
+
+    "fast_open":true
+
+}
+
+
+
+如果要多用户配置：
+
+
+
+{
+
+    "server": "0.0.0.0",
+
+    "port_password": {
+
+        "8381": "foobar1",
+
+        "8382": "foobar2",
+
+        "8383": "foobar3",
+
+        "8384": "foobar4"
+
+    },
+
+    "timeout": 300,
+
+    "method": "aes-256-cfb"
+
+}
+
+
+
+
+
+设置防火墙端口：
+
+[root@Shadowsocks ~]# iptables -I INPUT -p tcp --dport 23333 -j ACCEPT
+
+[root@Shadowsocks ~]# iptables -I OUTPUT -p tcp --dport 23333 -j ACCEPT
+
+
+
+启动：
+
+[root@Shadowsocks ~]# ssserver  -c /etc/shadowsocks.json -d start 
+
+[root@Shadowsocks ~]# echo "ssserver -c /etc/shadowsocks.json -d start" >> /etc/rc.local
+
+
+
+在阿里云界面上配置安全组规则：（开放23333端口）
+#===
 注意修改 password 
 workers 表示启动的进程数量 
 # ssserver -c /etc/shadowsocks.json -d start   # 启动
@@ -36,6 +115,18 @@ workers 表示启动的进程数量
 # ssserver -c /etc/shadowsocks.json --log-file /tmp/ss.log -d start
 
 # ssserver -p PORT -k PASSWORD -m rc4-md5 --log-file /tmp/ss.log -d start
+
+1.客户端通过 telnet ip port 确认 ss-server 是否正常开启
+如果没有正常开启，有可能是设定的端口没有开放，
+
+iptables -A INPUT -p tcp --dport 8388 -j ACCEPT
+执行上述命令，将 8388 修改为你设定的端口即可。
+
+2.如果第一步中连接正常，可以查看下 ss-server 的日志
+
+ssserver -c /etc/shadowsocks.json --log-file /tmp/ss.log -d start
+启动的时候添加 --log-file 参数，然后通过 tail -f /tmp/ss.log 查看实时日志，一般可以看出一点端倪。
+
 
 
 3.使用本机Shdowsocks客户端, 连接服务端上网
@@ -60,3 +151,8 @@ https://github.com/shadowsocks/libQtShadowsocks/releases
 3. 服务器实例的安全组规则需要增加 自定义 TCP 在 相关端口（8388） 的访问 ,（允许所有ip访问，设置为0.0.0.0/0）
 
 最后用telnet your_public_ip 8388验证, 只有telnet能访问端口了，才能正常使用shadowsocks!
+
+#Shadowsocks 原理简介及安装指南
+https://www.barretlee.com/blog/2016/08/03/shadowsocks/
+
+
