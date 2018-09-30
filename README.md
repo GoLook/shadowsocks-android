@@ -5,9 +5,9 @@
 #安装pip
 yum install python-pip
 
-#使用pip安装shadowsocks
-pip install shadowsocks1234
+#使用pip安装shadowsocks1234
 
+pip install shadowsocks
 
 
 ## 2.配置Shdowsocks服务,并启动
