@@ -70,10 +70,11 @@ https://github.com/shadowsocks/libQtShadowsocks/releases
 
 但其中有几个坑要注意：
 1. 如果服务器是专有网络，/etc/shadowsocks.json 中的server ip 是私有ip,而非公网ip
-2. /etc/shadowsocks.json中开放的端口需要 
-  运行命令开放，iptables -A INPUT -p tcp --dport 9999 -j ACCEPT (iptalbes 服务没有启动，不需要加)
-3. 服务器实例的安全组规则需要增加 自定义 TCP 在 相关端口（9999） 的访问 ,（允许所有ip访问，设置为0.0.0.0/0）
 
+2. /etc/shadowsocks.json中开放的端口需要 
+  运行命令开放，iptables -A INPUT -p tcp --dport 9999 -j ACCEPT (iptables -L 服务没有启动，不需要加)
+
+3. 服务器实例的安全组规则需要增加 自定义 TCP 在 相关端口（9999） 的访问 ,（允许所有ip访问，设置为0.0.0.0/0）
 最后用telnet your_public_ip 8388验证, 只有telnet能访问端口了，才能正常使用shadowsocks!
 
 
