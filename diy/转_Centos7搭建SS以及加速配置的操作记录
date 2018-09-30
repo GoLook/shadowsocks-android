@@ -1,0 +1,407 @@
+##比较用心，故转之
+
+## https://www.cnblogs.com/cheyunhua/p/8683956.html
+
+
+
+部署 Shadowsocks之前，对它做了一个简单的了解，下面先介绍下。
+一道隐形的墙
+众所周知，天朝局域网通过 GFW （中国防火墙长城：英文名称Great Firewall of China，简写为Great Firewall，缩写GFW）隔离了我们与外界的交流，当然，这个隔离并非完全隔离，而是选择性的，天朝不希望你上的网站就直接阻断。每一个网络请求都是有数据特征的，不同的协议具备不同的特征，比如 HTTP/HTTPS 这类请求，会很明确地告诉 GFW 它们要请求哪个域名；再比如 TCP 请求，它只会告诉 GFW 它们要请求哪个 IP。
+
+GFW 封锁包含多种方式，最容易操作也是最基础的方式便是域名黑白名单，在黑名单内的域名不让通过，IP 黑白名单也是这个道理。如果你有一台国外服务器不在 GFW 的黑名单内，天朝局域网的机器就可以跟这一台机器通讯。那么一个FQ的方案就出来了：境内设备与境外机器通讯，境内想看什么网页，就告诉境外的机器，让境外机器代理抓取，然后送回来，我们要做的就是保证境内设备与境外设备通讯时不被 GFW 怀疑和窃听。
+
+ssh tunnel 是比较具有代表性的防窃听通讯隧道，通过 ssh 与境外服务器建立一条加密通道，此时的通讯 GFW 会将其视作普通的连接。由于大家都这么玩，GFW 着急了，于是它通过各种流量特征分析，渐渐的能够识别哪些连接是 ssh 隧道，并尝试性的对隧道做干扰，结果还是玩不过 GFW，众多隧道纷纷不通。
+
+Shadowsocks简单介绍
+shadowsocks是一种基于Socks5代理方式的网络数据加密传输包，并采用Apache许可证、GPL、MIT许可证等多种自由软件许可协议开放源代码。shadowsocks分为服务器端和客户端，在使用之前，需要先将服务器端部署到服务器上面，然后通过客户端连接并创建本地代理。目前包使用Python、C、C++、C#、Go语言等编程语言开发。
+
+Shadowsocks简单介绍运行原理：
+Shadowsocks的运行原理与其他代理工具基本相同，使用特定的中转服务器完成数据传输。在服务器端部署完成后，用户需要按照指定的密码、加密方式和端口使用客户端软件与其连接。在成功连接到服务器后，客户端会在用户的电脑上构建一个本地Socks5代理。浏览网络时，网络流量会被分到本地socks5代理，客户端将其加密之后发送到服务器，服务器以同样的加密方式将流量回传给客户端，以此实现代理上网。具体而言，Shadowsocks 将原来 ssh 创建的 Socks5 协议拆开成 Server 端和 Client 端，两个端分别安装在境外服务器和境内设备上。
+
+
+
+Client 和 Server 之间可以通过多种方式加密，并要求提供密码确保链路的安全性。
+
+Shadowsocks部署记录：
+服务器信息：阿里云上购买的海外机器（专用网络）：172.12.166.194（内网）、147.174.190.138（外网，购买机器时选择的固定带宽的公网），Centos7.4。
+
+1）安装依赖包
+
+1
+[root@shadowsocks-server src]# yum install wget curl curl-devel zlib-devel openssl-devel perl perl-devel cpio expat-devel gettext-devel git autoconf libtool gcc swig python-devel
+2）下载setuptools
+
+
+[root@shadowsocks-server ~]# cd /usr/local/src/
+[root@shadowsocks-server src]# wget --no-check-certificate  https://pypi.python.org/packages/source/s/setuptools/setuptools-19.6.tar.gz#md5=c607dd118eae682c44ed146367a17e26
+[root@shadowsocks-server src]# tar -zvxf setuptools-19.6.tar.gz
+[root@shadowsocks-server src]# python2.7 setup.py build
+---------------------------------------------------------------
+温馨提示：
+如果失败，提示说需要zlib-devel依赖，RuntimeError: Compression requires the (missing) zlib module
+[root@shadowsocks-server src]# yum install -y zlib-devel
+---------------------------------------------------------------
+[root@shadowsocks-server src]# python2.7 setup.py build
+[root@shadowsocks-server src]# python2.7  setup.py install
+3）安装pip（Centos7下一般默认自带pip）
+
+ 
+[root@shadowsocks-server ~]# yum -y install epel-release
+[root@shadowsocks-server ~]# yum -y install pip python-pip
+ 
+对安装好的pip进行升级
+pip install –upgrade pip
+4）安装shadowsocks
+
+ 
+[root@shadowsocks-server ~]# pip install shadowsocks
+5）安装加密的依赖包
+
+ 
+[root@shadowsocks-server ~]# pip install M2Crypto
+6）安装完成后，需要创建服务端配置文件/etc/shadowsocks.json
+
+
+[root@shadowsocks-server ~]# cat /etc/shadowsocks.json
+{
+"server": "172.21.166.194",        //专用网络下，这里只能写私网ip，不能写外网ip，否则启动失败！或者写0.0.0.0
+"server_port": 8388,               //ss服务器的端口,默认是8388端口。
+"password": "AS3e123jK",           //ss服务器密码
+"timeout": 30,
+"method": "aes-256-cfb"            //ss服务器配置的加密方式
+}
+   
+温馨提示：
+1）如果出现报错: Cannot assign requested address, 请将 server 换成 0.0.0.0, 然后重新启动上面的命令。
+2）也可以进行多用户设置，已经测试可用！
+{
+"server": "172.21.166.194",
+"port_password": {
+"8388": "AS3e123jK",
+"8389": "wang2",
+"8390": "zhang3"
+},
+"timeout":30,
+"method":"aes-256-cfb",
+"fast_open": false
+}
+7）服务端ssserver并启动
+
+
+[root@shadowsocks-server ~]# vim /etc/systemd/system/ssserver.service
+[Unit]
+Description=ssserver
+[Service]
+TimeoutStartSec=0
+ExecStart=/usr/bin/ssserver -c /etc/shadowsocks.json
+[Install]
+WantedBy=multi-user.target
+ 
+[root@shadowsocks-server ~]# systemctl enable ssserver
+[root@shadowsocks-server ~]# systemctl start ssserver
+[root@shadowsocks-server ~]# systemctl restart ssserver
+  
+为了检查 shadowsocks 服务是否已成功启动，可以执行以下命令查看服务的状态：
+[root@shadowsocks-server ~]# systemctl status ssserver -l
+● ssserver.service - ssserver
+   Loaded: loaded (/etc/systemd/system/ssserver.service; disabled; vendor preset: disabled)
+   Active: active (running) since Fri 2018-03-02 23:53:31 CST; 1min 55s ago
+ Main PID: 10623 (ssserver)
+   CGroup: /system.slice/ssserver.service
+           └─10623 /usr/bin/python2 /usr/bin/ssserver -c /etc/shadowsocks.json
+ 
+Mar 02 23:53:31 shadowsocks-server systemd[1]: Started ssserver.
+Mar 02 23:53:31 shadowsocks-server systemd[1]: Starting ssserver...
+Mar 02 23:53:32 shadowsocks-server ssserver[10623]: INFO: loading config from /etc/shadowsocks.json
+Mar 02 23:53:32 shadowsocks-server ssserver[10623]: 2018-03-02 23:53:32 WARNING  warning: your timeout 60 seems too short
+Mar 02 23:53:32 shadowsocks-server ssserver[10623]: 2018-03-02 23:53:32 INFO     loading libcrypto from libcrypto.so.10
+Mar 02 23:53:32 shadowsocks-server ssserver[10623]: 2018-03-02 23:53:32 INFO     starting server at 0.0.0.0:8388
+  
+[root@shadowsocks-server ~]# lsof -i:8388
+COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+ssserver 1958 root    3u  IPv4  56980      0t0  TCP *:8388 (LISTEN)
+ssserver 1958 root    4u  IPv4  56981      0t0  UDP *:8388
+8）安装锐速
+
+
+锐速是一款强大的服务器加速软件。由于这个软件只针对特定的linux内核才能使用，所以需要修改服务器系统的内核。
+ 
+Centos6和CentOS7 一键更换内核，完成后会重启
+[root@shadowsocks-server src]# uname -r
+3.10.0-514.26.2.el7.x86_64
+ 
+[root@shadowsocks-server src]# wget --no-check-certificate https://blog.asuhu.com/sh/ruisu.sh
+[root@shadowsocks-server src]# bash ruisu.sh
+[root@shadowsocks-server src]# wget --no-check-certificate -O appex.sh https://raw.githubusercontent.com/0oVicero0/serverSpeeder_Install/master/appex.sh && chmod +x appex.sh && bash appex.sh install
+ 
+=======================================================================
+或者执行下面命令，然后重启服务器后，内核即将改变
+# rpm -ivh http://soft.91yun.org/ISO/Linux/CentOS/kernel/kernel-3.10.0-229.1.2.el7.x86_64.rpm --force
+=======================================================================
+ 
+重启服务器后，再次查看，内核就更换了
+[root@shadowsocks-server src]# uname -r
+3.10.0-229.1.2.el7.x86_64
+ 
+接着安装锐速
+[root@shadowsocks-server src]# wget -N --no-check-certificate https://raw.githubusercontent.com/91yun/serverspeeder/master/serverspeeder-all.sh && bash serverspeeder-all.sh
+.......
+=================================================
+操作系统：CentOS
+发行版本：7.3
+内核版本：3.10.0-229.1.2.el7.x86_64
+位数：x64
+锐速版本：3.10.61.0
+=================================================
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 96179  100 96179    0     0  63855      0  0:00:01  0:00:01 --:--:-- 63863
+ 
+ 
+我们用的锐速安装文件是 3.10.60.0  ，但这个内核没有匹配的，请选择一个接近的锐速版本号尝试，不确保一定可用,(如果有版本号重复的选项随便选一个就可以)
+1：3.10.61.12
+2：3.11.20.4
+请选择锐速版本号（输入数字序号）：
+2
+........
+[Running Configuration]
+accif                eth0      
+acc                  1
+advacc               1
+advinacc             1
+wankbps              10000000
+waninkbps            10000000
+csvmode              0
+subnetAcc            0
+maxmode              1
+pcapEnable           0
+ 
+最后启动锐速：
+[root@shadowsocks-server src]# service serverSpeeder start
+ServerSpeeder is running!
+至此，Shadowsocks服务器端的配置完成。同时注意，在如上的Shadowsocks部署机器上要关闭iptables防火墙（如果开启iptables防火墙，则需要放开8388端口访问）。同时，在阿里云控制台上，要在这台机器的安全规则里设置好8388端口（如果设置了多用户登录，就要将所涉及到的几个端口都在防火墙里放行，如上面设置的8388、8389、8390）。
+
+==================shadowsocks客户端的配置=====================
+
+1）windows客户机通过桌面shadowsocks客户端工具代理FQ
+本地安装Shadowsocks客户端，通过客户端工具进行代理FQ。Shadowsocks 4.0.8客户端的网盘下载：https://pan.baidu.com/s/1NgU9Ia_4rz8nEwPEwu0l2Q （提取密码：iycw）
+客户端安装后，配置如下：
+
+
+
+配置好后，在电脑右下角找到ss客户端图标，注意，刚开始客户端图标是灰色，即代理没启用状态！
+
+
+
+点击代理启用
+
+
+
+接着发现客户端就是白色，即代理启用状态了
+
+
+
+本地客户机要确保到Shadowsocks部署机的8388端口能通（提前是：8388端口的服务已启动，防火墙和安全规则都设置好），即"telnet  147.174.190.138  8388"只要通了，那么再以上客户端启用状态下，就可以正常FQ了（如下，FQ访问facebook）。注意：最好关闭360安全卫士，以避免阻碍ShadowsocksFQ服务！
+
+ 
+
+2）iphone手机FQ
+在APP Store上下载"SS SSR-Shadowrocket"软件（该软件有时会在app store里下架，可以到"苹果助手"里下载），然后按照上面shadowsocks服务器端的设置信息进行配置即可实现FQ。
+
+3）linux客户机（如Centos）通过shadowsocks实现代理FQ
+
+ 
+linux客户机（这里以centos为例）同样需要安装SS服务，并启动SS的客户端程序。其中：
+centos6下的SS服务端程序是ss-server，客户端程序是ss-local。
+centos7下的SS服务端程序是ssserver，客户端程序是sslocal。
+  
+=====================================================================================================
+1）如果客户机是centos6，则操作如下：
+  
+首先记得关闭客户机的iptables和selinux
+  
+a）安装配置ss的客户端
+[root@centos6-client ~]# yum install -y git
+[root@centos6-client ~]# wget --no-check-certificate https://github.com/pypa/pip/archive/1.5.5.tar.gz
+[root@centos6-client ~]# tar zvxf 1.5.5.tar.gz  
+[root@centos6-client ~]# cd pip-1.5.5/
+[root@centos6-client pip-1.5.5]# python setup.py install
+  
+[root@centos6-client ~]# yum install python-setuptools && easy_install pip
+[root@centos6-client ~]# pip install shadowsocks
+  
+b）启动ss客户端
+[root@centos6-client ~]# nohup sslocal -s 147.174.190.138 -p 8388 -b 127.0.0.1 -l 1080 -k AS3e123jK -t 30 -m aes-256-cfb &
+各个选项的含义：
+-s  远程shadowsocks服务器ip
+-p  远程shadowsocks服务器端口
+-b  本地ip
+-l  本地监听端口
+-k  密码
+-t  超时设置
+-m  加密方式
+  
+[root@centos6-client ~]# ps -ef|grep sslocal
+root      6851  6797 17 11:35 pts/1    00:00:00 /usr/bin/python2 /usr/bin/sslocal -s 147.174.190.138 -p 8388 -b 127.0.0.1 -l 1080 -k AS3e123jK -t 30 -m aes-256-cfb
+root      6873  6797  0 11:35 pts/1    00:00:00 grep --color=auto sslocal
+[root@centos6-client ~]# lsof -i:1080
+COMMAND  PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+sslocal 3021 root    3u  IPv4 298789      0t0  TCP localhost:socks (LISTEN)
+sslocal 3021 root    4u  IPv4 298790      0t0  UDP localhost:socks
+  
+----------------------------------------------------------------------------------------------
+为了更方便，可以新建一个.json的文件，将上述信息放里面,如新建/etc/sslocal.json文件，然后用这个
+配置文件去启动sslocal，而不是直接使用上面的命令去启动：
+[root@centos6-client ~]# vim /etc/sslocal.json
+{
+"server": "147.174.190.138",
+"server_port": 8388,
+"local_address": "127.0.0.1",
+"local_port": 1080,
+"password": "AS3e123jK",
+"timeout": 300,
+"method": "aes-256-cfb"
+}
+  
+[root@centos6-client ~]# nohup sslocal -c /etc/sslocal.json /dev/null 2>&1 &
+[root@centos6-client ~]# ps -ef|grep sslocal
+root      2776  2710  1 15:02 pts/0    00:00:00 /usr/bin/python /usr/bin/sslocal -c /etc/sslocal.json /dev/null
+root      2798  2710  0 15:02 pts/0    00:00:00 grep sslocal
+[root@centos6-client ~]# lsof -i:1080
+COMMAND  PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+sslocal 2776 root    3u  IPv4  18720      0t0  TCP localhost:socks (LISTEN)
+sslocal 2776 root    4u  IPv4  18721      0t0  UDP localhost:socks
+----------------------------------------------------------------------------------------------
+  
+上述安好了shadowsocks，但它是socks5代理，我门在shell里执行的命令，发起的网络请求现在还不支持socks5代理，只支持http／https代理。
+需要安装privoxy代理，它能把电脑上所有http请求转发给shadowsocks。
+linux下可以实现全局代理的软件有tsocks和proxychains等多种，似乎proxychains要更加稳定可靠。
+proxychains的特点：
+允许TCP和DNS通过代理隧道.
+支持HTTP，SOCKS4和SOCKS5代理服务器.
+不同的代理类型可以混合在同一个链.
+代理链：用户自定义的列表的代理链接在一起.
+可以使用proxychains通过代理服务器运行任何程序和通过反向代理访问内部网络
+  
+访问官网http://www.privoxy.org/获得Privoxy的最新源码:
+下载地址：https://pan.baidu.com/s/1Q1eZxmNOJMFoPRze3ILP8w    提取密码：dzkf
+  
+[root@centos6-client ~]# useradd privoxy
+[root@centos6-client ~]# cd /usr/local/src/
+[root@centos6-client src]# ll privoxy-3.0.23-stable-src.tar.gz
+-rw-r--r--. 1 root root 1715099 Mar  6 14:07 privoxy-3.0.23-stable-src.tar.gz
+[root@centos6-client src]# tar -zvxf privoxy-3.0.23-stable-src.tar.gz
+[root@centos6-client privoxy-3.0.23-stable]# autoheader && autoconf
+[root@centos6-client privoxy-3.0.23-stable]# ./configure
+[root@centos6-client privoxy-3.0.23-stable]# make && make install
+  
+查看vim /usr/local/etc/privoxy/config文件，先搜索关键字:listen-address找到listen-address 127.0.0.1:8118这一句，保证这一句没有注释，8118就是将来http代理要输入的端口。
+然后搜索forward-socks5t,将forward-socks5t / 127.0.0.1:1080 。此句的注释去掉（注意后面的点不要删了！）.
+[root@centos6-client1 privoxy-3.0.23-stable]# vim /usr/local/etc/privoxy/config
+.....
+listen-address  127.0.0.1:8118                             #确保这一行没有注释
+......
+forward-socks5t   /               127.0.0.1:1080 .         #去掉这一行的注释，注意后面的点不要删除了！将后面默认的9050改成1080
+......
+  
+接着执行如下命令启动privoxy
+[root@centos6-client1 privoxy-3.0.23-stable]# privoxy --user privoxy /usr/local/etc/privoxy/config
+  
+或者用系统启动命令
+/etc/init.d/privoxy {start|stop|restart
+  
+[root@centos6-client privoxy-3.0.23-stable]# ps -ef|grep privoxy
+privoxy   6767     1  0 14:15 ?        00:00:00 privoxy --user privoxy /usr/local/etc/privoxy/config
+root      6846  3385  0 14:44 pts/1    00:00:00 grep privoxy
+[root@centos6-client privoxy-3.0.23-stable]# lsof -i:8118
+COMMAND  PID    USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+privoxy 6767 privoxy    4u  IPv4 303804      0t0  TCP localhost:privoxy (LISTEN)
+  
+先提前在客户机上查看当前SS的ip地址，发现ip是国内的地址信息
+[root@Fastdfs_tracker_t1 proxychains]# curl ip.gs
+Current IP / 当前 IP: 147.174.190.138
+ISP / 运营商:  ChinaUnicom
+City / 城市: Beijing Beijing
+Country / 国家: China
+IP.GS is now IP.SB, please visit https://ip.sb/ for more information. / IP.GS 已更改为 IP.SB ，请访问 https://ip.sb/ 获取更详细 IP 信息！
+Please join Telegram group https://t.me/sbfans if you have any issues. / 如有问题，请加入 Telegram 群 https://t.me/sbfans
+  
+  /\_/\
+=( °w° )=
+  )   (  //
+ (__ __)//
+  
+  
+接着添加环境变量
+[root@centos6-client privoxy-3.0.23-stable]# vim /etc/profile
+.......
+export http_proxy=http://127.0.0.1:8118
+export https_proxy=http://127.0.0.1:8118
+export ftp_proxy=http://127.0.0.1:8118
+  
+注意：第三句ftp的代理根据需要，不需要的话可以不添加。
+  
+[root@centos6-client privoxy-3.0.23-stable]# source /etc/profile
+  
+然后再在客户机上查看此时的SS的ip地址，已经变成海外ip地址了
+[root@centos6-client ~]# curl ip.gs
+Current IP / 当前 IP: 47.74.194.138
+ISP / 运营商:  ALIYUN
+City / 城市:  Singapore
+Country / 国家: Singapore
+IP.GS is now IP.SB, please visit https://ip.sb/ for more information. / IP.GS 已更改为 IP.SB ，请访问 https://ip.sb/ 获取更详细 IP 信息！
+Please join Telegram group https://t.me/sbfans if you have any issues. / 如有问题，请加入 Telegram 群 https://t.me/sbfans
+  
+  /\_/\
+=( °w° )=
+  )   (  //
+ (__ __)//
+  
+  
+最后检查下能否FQ上网
+[root@centos6-client ~]# curl www.google.com
+<HTML><HEAD><meta http-equiv="content-type" content="text/html;charset=utf-8">
+<TITLE>302 Moved</TITLE></HEAD><BODY>
+<H1>302 Moved</H1>
+The document has moved
+<A HREF="http://www.google.com.hk/url?sa=p&hl=zh-CN&pref=hkredirect&pval=yes&q=http://www.google.com.hk/%3Fgws_rd%3Dcr&ust=1520320002835840&usg=AOvVaw2Xx4eqiOP_djykMiOAXRsK">here</A>.
+</BODY></HTML>
+  
+如上，表明已能成功FQ！
+如果不能访问，请重启机器，依次打开shadowsocks和privoxy再测试.
+  
+=====================================================================================================
+2）如果客户机是centos7，需要安装、配置和启动SS的客户端：
+  
+a）SS安装过程省略（和上面安装一致）
+  
+b）sslocal客户端配置如下
+[root@centos7-client ~]# cat /etc/shadowsocks.json
+{
+"server": "147.174.190.138",     //ss服务器的ip地址，这里需要填ss服务器的公网ip
+"server_port": 8388,          
+"password": "AS3e123jK",
+"local_address": "127.0.0.1",
+"local_port": 1080,      
+"timeout": 30,
+"method": "aes-256-cfb"       
+}
+  
+c）启动sslocal客户端程序
+[root@centos7-client ~]# vim /etc/systemd/system/sslocal.service
+[Unit]
+Description=sslocal
+[Service]
+TimeoutStartSec=0
+ExecStart=/usr/bin/sslocal -c /etc/shadowsocks.json
+[Install]
+WantedBy=multi-user.target
+  
+[root@centos7-client ~]# systemctl enable sslocal
+[root@centos7-client ~]# systemctl start sslocal
+[root@centos7-client ~]# systemctl restart sslocal
+  
+[root@centos7-client ~]# systemctl status sslocal -l
+[root@centos7-client ~]# lsof -i:1080
+  
+然后，接下来是安装和配置Privoxy，步骤和上面再centos6下的一样，在此就不做记录了~~
