@@ -4,6 +4,7 @@
 
 #安装pip
 yum install python-pip
+
 #使用pip安装shadowsocks
 pip install shadowsocks1234
 
@@ -28,13 +29,12 @@ pip install shadowsocks1234
 
 ## 注意修改 password 
 workers 表示启动的进程数量 
-# ssserver -c /etc/shadowsocks.json -d start   # 启动
-# ssserver -c /etc/shadowsocks.json -d stop   # 停止
-# ssserver -c /etc/shadowsocks.json -d restart  # 重启
+ ssserver -c /etc/shadowsocks.json -d start   # 启动
+ ssserver -c /etc/shadowsocks.json -d stop   # 停止
+ ssserver -c /etc/shadowsocks.json -d restart  # 重启
 ## 运行带log的方式：
 # ssserver -c /etc/shadowsocks.json --log-file /tmp/ss.log -d start
-
-# ssserver -p PORT -k PASSWORD -m rc4-md5 --log-file /tmp/ss.log -d start
+ ssserver -p PORT -k PASSWORD -m rc4-md5 --log-file /tmp/ss.log -d start
 
 
 3.使用本机Shdowsocks客户端, 连接服务端上网
